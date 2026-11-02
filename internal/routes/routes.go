@@ -36,11 +36,17 @@ type Seat struct {
 	Soon []time.Time
 	// Lapse is when the soonest of what it has left is lost, apart from
 	// its windows' renewals (Allowance.Lapse): zero when not told. Smart
-	// goes by it when Soon ties.
+	// goes by it when Soon ties, Pace ahead of a seat whose pace runs by
+	// after that: what is lost before the reset it is measured to is not
+	// there to keep (a sign-in credit that lapses tomorrow, #4923).
 	Lapse time.Time
 	// Pace is its week left per hour until that renews; an account not
 	// known has a whole week (provider.FreshPace), a key none
 	Pace float64
+	// PaceDue is when the window Pace went by renews (left.due): zero when
+	// not known. Pace lets a seat whose Lapse is before it go first: its
+	// pace is measured to a reset that can't keep what lapses before it.
+	PaceDue time.Time
 	// Weight is its key's weight, at least 1
 	Weight int
 	// Resting: it rests after a failure now

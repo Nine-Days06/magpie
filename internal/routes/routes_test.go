@@ -174,6 +174,32 @@ func TestPace(t *testing.T) {
 	}
 }
 
+// What lapses before the reset its pace is measured to goes first: the
+// weekly pace of a sign-in credit good till tomorrow reads low beside one
+// renewing in six days, yet at the reset there is nothing of it left to
+// keep (#4923). The sooner lapse leads among those, one that tells none
+// goes after them, and what lapses only at its own renewal — before no
+// window that counts — stays in pace order, as in Smart's manner. A seat
+// running low waits whatever it lapses to.
+func TestPaceLapseBeforeRenewal(t *testing.T) {
+	now := time.Now()
+	weekly := func(key string, pace float64) Seat {
+		return Seat{Key: key, Known: true, Pace: pace, PaceDue: now.Add(6 * 24 * time.Hour)}
+	}
+	signIn := Seat{Key: "signIn", Known: true, Pace: 1,
+		PaceDue: now.Add(6 * 24 * time.Hour), Lapse: now.Add(24 * time.Hour)}
+	sooner := Seat{Key: "sooner", Known: true, Pace: 2,
+		PaceDue: now.Add(6 * 24 * time.Hour), Lapse: now.Add(2 * time.Hour)}
+	atRenewal := Seat{Key: "atRenewal", Known: true, Pace: 3,
+		PaceDue: now.Add(6 * 24 * time.Hour), Lapse: now.Add(6 * 24 * time.Hour)}
+	low := Seat{Key: "low", Known: true, Used: 95, Pace: 9, Lapse: now.Add(time.Hour)}
+	s := []Seat{weekly("week", 10), signIn, sooner, atRenewal, weekly("plain", 1), low}
+	if got := keys(s, Apply(Pace, "p", s)); !slices.Equal(got,
+		[]string{"sooner", "signIn", "week", "atRenewal", "plain", "low"}) {
+		t.Fatalf("lapse before renewal: %v, want [sooner signIn week atRenewal plain low]", got)
+	}
+}
+
 // By weight: over six requests a seat weighing 2 goes first twice as often
 // as each weighing 1, and the others follow the one picked in their order.
 func TestWeighted(t *testing.T) {

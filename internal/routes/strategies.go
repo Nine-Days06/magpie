@@ -351,7 +351,14 @@ var LeastUsed = Strategy{ByUse: true, Order: func(_ string, seats []Seat) []int 
 // isn't, as in Smart, else it would never be known; then the pace, those
 // alike within a tenth by what a wallet has left (Seat.Left), then by what
 // magpie sent them lately, then in their
-// order, keeping the vendor's prompt cache warm. An account not known
+// order, keeping the vendor's prompt cache warm. Before the pace itself,
+// a seat whose Lapse is sooner than the reset its pace is measured to
+// (Seat.PaceDue) goes ahead of one whose pace would carry it past that:
+// what lapses before the reset isn't there to keep, however high its week
+// left per hour to the reset reads (a sign-in credit good till tomorrow
+// behind a weekly allowance renewing in six days, #4923). Among those, and
+// in Smart's manner, the sooner lapse first to the hour, one that tells
+// none after those that do. An account not known
 // counts as a whole week ahead of it; a key has no week, unless it reads
 // its own windows (a sub2api key's limits). A Codex account that spends a
 // reset about to run out by itself goes by the hours until then when that
@@ -396,6 +403,13 @@ var Pace = Strategy{ByUse: true, Order: func(_ string, seats []Seat) []int {
 			}
 		} else if sa.Learns != sb.Learns {
 			return sa.Learns
+		} else if ea, eb := lapsesBeforePace(sa), lapsesBeforePace(sb); ea != eb {
+			// what is lost before the reset its pace went by: first
+			return ea
+		} else if ea {
+			if x, y := sa.Lapse.Truncate(time.Hour), sb.Lapse.Truncate(time.Hour); !x.Equal(y) {
+				return x.Before(y)
+			}
 		} else if band[idx[a]] != band[idx[b]] {
 			return band[idx[a]] < band[idx[b]]
 		} else if left != nil {
@@ -409,6 +423,18 @@ var Pace = Strategy{ByUse: true, Order: func(_ string, seats []Seat) []int {
 	})
 	return idx
 }}
+
+// lapsesBeforePace: whether the seat tells of something it has left being
+// lost before the window its pace went by renews (Seat.Lapse before
+// Seat.PaceDue), so that pace would weigh it to a reset it can't keep to
+// (#4923). False when it tells of no lapse; a pace that went by no known
+// window (zero PaceDue) is measured past any lapse it tells.
+func lapsesBeforePace(s Seat) bool {
+	if s.Lapse.IsZero() {
+		return false
+	}
+	return s.PaceDue.IsZero() || s.Lapse.Before(s.PaceDue)
+}
 
 // Weighted spreads a pool's requests over its seats by each one's weight,
 // smoothly (Round): the one the pool's round picks now first, the others
